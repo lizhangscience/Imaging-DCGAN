@@ -26,8 +26,8 @@ def dataset_files(root):
 
 class DCGAN(object):
     def __init__(self, sess, data_path, image_size=64, is_crop=False,
-                 batch_size=50, sample_size=512, lowres=8,
-                 z_dim=100, gf_dim=64, df_dim=512,
+                 batch_size=50, sample_size=64, lowres=8,
+                 z_dim=100, gf_dim=64, df_dim=64,
                  gfc_dim=1024, dfc_dim=1024, c_dim=1,
                  checkpoint_dir=None, lam=0.1):
         """
@@ -210,13 +210,13 @@ class DCGAN(object):
         for epoch in range(config.epoch):
             # data = dataset_files(config.dataset)
             # batch_idxs = min(len(self.data[:,0,0]), config.train_size) // self.batch_size
-            batch_idxs = 50
+            batch_idxs = 15
             print('batch_idx ',batch_idxs)
 
             print('epoch ', epoch)
 
             for idx in range(0, batch_idxs):
-                print(idx)
+                print('IDX: ',idx)
                 # batch_files = data[idx*config.batch_size:(idx+1)*config.batch_size]
                 # batch = [get_image(batch_file, self.image_size, is_crop=self.is_crop)
                 #          for batch_file in batch_files]
@@ -450,13 +450,13 @@ class DCGAN(object):
             print('z_ ',np.shape(self.z_))
             # TODO: Nicer iteration pattern here. #readability
             hs = [None]
-            hs[0] = tf.reshape(self.z_, [-1, 8, 8, self.gf_dim * 16])
+            hs[0] = tf.reshape(self.z_, [-1, 4,4, self.gf_dim * 8])
             print('hs[0] ',np.shape(hs[0]))
             hs[0] = tf.nn.relu(self.g_bns[0](hs[0], self.is_training))
 
             i = 1 # Iteration number.
-            depth_mul = 16  # Depth decreases as spatial component increases.
-            size = 16  # Size increases as depth decreases.
+            depth_mul = 8  # Depth decreases as spatial component increases.
+            size = 8  # Size increases as depth decreases.
 
             while size < self.image_size:
                 hs.append(None)
