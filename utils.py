@@ -20,13 +20,18 @@ get_stddev = lambda x, k_h, k_w: 1/math.sqrt(k_w*k_h*x.get_shape()[-1])
 
 
 def get_data(data_path):
-    return np.array(np.load(data_path))
+    data = np.array(np.load(data_path))
+    idx_array = np.arange(0,len(data[:,0,0]),1)
+    return data, idx_array
 
 def get_image(image_path, image_size, is_crop=True):
     return transform(imread(image_path), image_size, is_crop)
 
 def save_images(images, size, image_path):
-    return imsave(inverse_transform(images), size, image_path)
+    return imsave(images, size, image_path)
+
+def save_image(image,size, image_path):
+    scipy.misc.imsave(image_path, image)
 
 def imread(path):
     return scipy.misc.imread(path, mode='RGB').astype(np.float)
