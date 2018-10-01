@@ -34,7 +34,7 @@ parser.add_argument('--maskType', type=str,
 parser.add_argument('--centerScale', type=float, default=0.25)
 parser.add_argument('--dataset',type=str,default='data/sasha_data_small.npy')
 parser.add_argument('--batch_size', type=int,default=10)
-parser.add_argument('--train_size', type=int,default=94)
+parser.add_argument('--train_size', type=int,default=809)
 parser.add_argument('--zhats',type=str,default='none')
 # parser.add_argument('imgs', type=int, default=10)
 
