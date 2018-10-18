@@ -16,12 +16,12 @@ from utils import pp, visualize, to_json
 import tensorflow as tf
 
 flags = tf.app.flags
-flags.DEFINE_integer("epoch", 500, "Epoch to train [25]")
+flags.DEFINE_integer("epoch", 100, "Epoch to train [25]")
 flags.DEFINE_float("learning_rate", 0.0002, "Learning rate of for adam [0.0002]")
 flags.DEFINE_float("beta1", 0.5, "Momentum term of adam [0.5]")
-flags.DEFINE_integer("train_size", 94, "The size of train images [np.inf]")
+flags.DEFINE_integer("train_size", 809, "The size of train images [np.inf]")
 flags.DEFINE_integer("batch_size", 5, "The size of batch images [64]")
-flags.DEFINE_integer("image_size", 256, "The size of image to use")
+flags.DEFINE_integer("image_size", 64, "The size of image to use")
 flags.DEFINE_string("dataset", "lfw-aligned-64", "Dataset directory.")
 flags.DEFINE_string("checkpoint_dir", "checkpoint", "Directory name to save the checkpoints [checkpoint]")
 flags.DEFINE_string("sample_dir", "samples", "Directory name to save the image samples [samples]")

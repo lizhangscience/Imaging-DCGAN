@@ -30,11 +30,11 @@ def conv_out_size_same(size, stride):
     return int(math.ceil(float(size) / float(stride)))
 
 class DCGAN(object):
-    def __init__(self, sess, data_path, image_size=256, is_crop=False,
+    def __init__(self, sess, data_path, image_size=64, is_crop=False,
                  batch_size=10, sample_size=94, lowres=8,
-                 z_dim=100, gf_dim=8, df_dim=8,
+                 z_dim=200, gf_dim=2, df_dim=2,
                  gfc_dim=1024, dfc_dim=1024, c_dim=1,
-                 checkpoint_dir=None, lam=0.1):
+                 checkpoint_dir=None, lam=0.0):
         """
 
         Args:
@@ -217,8 +217,8 @@ class DCGAN(object):
         for epoch in range(config.epoch):
 
             #reshuffle data every epoch
-            # self.data_shuffle = self.shuffle_data()
-            self.data_shuffle = self.data
+            self.data_shuffle = self.shuffle_data()
+            # self.data_shuffle = self.data
 
             for idx in range(0, batch_idxs):
                 # print('IDX: ',idx)
@@ -234,6 +234,9 @@ class DCGAN(object):
                 #setup batch z
                 batch_z = np.random.uniform(-1, 1, [config.batch_size, self.z_dim]) \
                             .astype(np.float32)
+
+                # batch_z = np.random.normal(0, 0.2, [config.batch_size, self.z_dim]) \
+                #     .astype(np.float32)
 
 
                 # Update D network
@@ -484,13 +487,43 @@ class DCGAN(object):
                 # vmin=np.min(diffimage[:,:,:,0]),
                 # vmax=np.max(diffimage[:,:,:,0]))
 
-                pl.imshow(diffimage[i, :, :, 0], interpolation='none')
-
+                pl.imshow(diffimage[i, :, :, 0], interpolation='none',vmin= -1.0,vmax=1.0)
                 pl.colorbar()
 
                 imgName = os.path.join(config.outDir,
-                                       'final/{:04d}.png'.format(frame_idx[i]))
+                                       'final/{:04d}_diff.png'.format(frame_idx[i]))
                 pl.savefig(imgName)
+
+                pl.figure(5)
+                pl.clf()
+                # pl.imshow(diffimage[i, :, :, 0],interpolation='none',
+                #           vmin = -0.05,
+                #           vmax = 0.05)
+                # vmin=np.min(diffimage[:,:,:,0]),
+                # vmax=np.max(diffimage[:,:,:,0]))
+
+                pl.imshow(batch_images[i, :, :, 0], interpolation='none',vmin= -1.0,vmax=1.0)
+                pl.colorbar()
+
+                imgName = os.path.join(config.outDir,
+                                       'final/{:04d}_batch.png'.format(frame_idx[i]))
+                pl.savefig(imgName)
+
+                pl.figure(6)
+                pl.clf()
+                # pl.imshow(diffimage[i, :, :, 0],interpolation='none',
+                #           vmin = -0.05,
+                #           vmax = 0.05)
+                # vmin=np.min(diffimage[:,:,:,0]),
+                # vmax=np.max(diffimage[:,:,:,0]))
+
+                pl.imshow(G_imgs[i, :, :, 0], interpolation='none',vmin= -1.0,vmax=1.0)
+                pl.colorbar()
+
+                imgName = os.path.join(config.outDir,
+                                       'final/{:04d}_G.png'.format(frame_idx[i]))
+                pl.savefig(imgName)
+
 
 
     def complete_final(self,config):
@@ -557,6 +590,7 @@ class DCGAN(object):
 
             h0 = lrelu(conv2d(image, self.df_dim, name='d_h0_conv'))
             print('d h0 ',np.shape(h0))
+            #The default df_dim is 32, but the input is ,why use bigger filter size?
             h1 = lrelu(self.d_bns[0](conv2d(h0, self.df_dim*2, name='d_h1_conv'), self.is_training))
             print('d h1 ', np.shape(h1))
             h2 = lrelu(self.d_bns[1](conv2d(h1, self.df_dim*4, name='d_h2_conv'), self.is_training))
@@ -564,20 +598,15 @@ class DCGAN(object):
             h3 = lrelu(self.d_bns[2](conv2d(h2, self.df_dim*8, name='d_h3_conv'), self.is_training))
             print('d h3 ', np.shape(h3))
 
-            h4 = lrelu(self.d_bns[3](conv2d(h3, self.df_dim * 16, name='d_h4_conv'), self.is_training))
-            print('d h4 ', np.shape(h4))
-
-            h5 = lrelu(self.d_bns[4](conv2d(h4, self.df_dim * 32, name='d_h5_conv'), self.is_training))
-            print('d h5 ', np.shape(h5))
-
-            hshape = h5.get_shape().as_list()
+            hshape = h3.get_shape().as_list()
             print(hshape)
 
             # h4 = linear(tf.reshape(h3, [-1, 8192]), 1, 'd_h4_lin')
-            h6 = linear(tf.reshape(h5, [-1, hshape[1]*hshape[2]*hshape[3]]), 1, 'd_h6_lin')
-            print('d h6 ', np.shape(h6))
+            h4 = linear(tf.reshape(h3, [-1, hshape[1] * hshape[2] * hshape[3]]), 1, 'd_h4_lin')
+            # h4 = linear(tf.reshape(h3, [-1, 8192]), 1, 'd_h4_lin')
+            print('d h4 ', np.shape(h4))
 
-            return tf.nn.sigmoid(h6), h6
+            return tf.nn.sigmoid(h4), h4
 
     def generator(self, z):
         with tf.variable_scope("generator") as scope:
@@ -586,52 +615,55 @@ class DCGAN(object):
             s_h4, s_w4 = conv_out_size_same(s_h2, 2), conv_out_size_same(s_w2, 2)
             s_h8, s_w8 = conv_out_size_same(s_h4, 2), conv_out_size_same(s_w4, 2)
             s_h16, s_w16 = conv_out_size_same(s_h8, 2), conv_out_size_same(s_w8, 2)
-            s_h32, s_w32 = conv_out_size_same(s_h16, 2), conv_out_size_same(s_w16, 2)
-            s_h64, s_w64 = conv_out_size_same(s_h32, 2), conv_out_size_same(s_w32, 2)
 
             # project `z` and reshape
-            self.z_, self.h0_w, self.h0_b = linear(z, self.gf_dim * 32 * s_h64 * s_w64, 'g_h0_lin', with_w=True)
+            self.z_, self.h0_w, self.h0_b = linear(z, self.gf_dim * 8 * s_h16 * s_w16, 'g_h0_lin', with_w=True)
 
             hs = [None]
-            hs[0] = tf.reshape(self.z_, [-1, s_h64, s_w64, self.gf_dim * 32])
+            hs[0] = tf.reshape(self.z_, [-1, s_h16, s_w16, self.gf_dim * 8])
             hs[0] = tf.nn.relu(self.g_bns[0](hs[0], self.is_training))
             print('h0 ',np.shape(hs[0]))
 
             hs.append(None)
-            hs[1], _, _ = conv2d_transpose(hs[0], [self.batch_size, s_h32, s_w32, self.gf_dim * 16], name='g_h1',
-                                           with_w=True)
+            #resize-covolution implementation.
+            #filter for convo = [filter_height, filter_width, in_channels, out_channels]
+            #filter for deconv = [height, width, output_channels, in_channels]
+            hs[1] = tf.image.resize_nearest_neighbor(hs[0],[s_h8,s_w8])
+            print('h1_resize ', np.shape(hs[1]))
+            hs[1] = conv2d(hs[1],self.gf_dim * 4,d_h = 1,d_w=1, name='g_h1')
+            # hs[1], _, _ = conv2d_transpose(hs[0], [self.batch_size, s_h8, s_w8, self.gf_dim * 4], name='g_h1',
+            #                               with_w=True)
             hs[1] = tf.nn.relu(self.g_bns[1](hs[1], self.is_training))
             print('h1 ', np.shape(hs[1]))
 
             hs.append(None)
-            hs[2], _, _ = conv2d_transpose(hs[1], [self.batch_size, s_h16, s_w16, self.gf_dim * 8], name='g_h2',
-                                           with_w=True)
+            hs[2]= tf.image.resize_nearest_neighbor(hs[1], [s_h4, s_w4])
+            hs[2] = conv2d(hs[2], self.gf_dim * 2, d_h = 1,d_w=1,name='g_h2')
+            # hs[2], _, _ = conv2d_transpose(hs[1], [self.batch_size, s_h4, s_w4, self.gf_dim * 2], name='g_h2',
+            #                                with_w=True)
             hs[2] = tf.nn.relu(self.g_bns[2](hs[2], self.is_training))
             print('h2 ', np.shape(hs[2]))
 
             hs.append(None)
-            hs[3], _, _ = conv2d_transpose(hs[2], [self.batch_size, s_h8, s_w8, self.gf_dim * 4], name='g_h3',
-                                           with_w=True)
+            hs[3]= tf.image.resize_nearest_neighbor(hs[2], [s_h2, s_w2])
+            hs[3] = conv2d(hs[3], self.gf_dim * 1, d_h = 1,d_w=1, name='g_h3')
+            # hs[3], _, _ = conv2d_transpose(hs[2], [self.batch_size, s_h2, s_w2, self.gf_dim * 1], name='g_h3',
+            #                                with_w=True)
+
             hs[3] = tf.nn.relu(self.g_bns[3](hs[3], self.is_training))
             print('h3 ', np.shape(hs[3]))
 
             hs.append(None)
-            hs[4], _, _ = conv2d_transpose(hs[3], [self.batch_size, s_h4, s_w4, self.gf_dim * 2], name='g_h4', with_w=True)
+            hs[4] = tf.image.resize_nearest_neighbor(hs[3], [s_h, s_w])
+            hs[4] = conv2d(hs[4], self.c_dim,d_h =1,d_w=1, name='g_h4')
+            # hs[4], _, _ = conv2d_transpose(hs[3], [self.batch_size, s_h, s_w, self.c_dim], name='g_h4', with_w=True)
             print('h4 ', np.shape(hs[4]))
-
-            hs.append(None)
-            hs[5], _, _ = conv2d_transpose(hs[4], [self.batch_size, s_h2, s_w2, self.gf_dim * 1], name='g_h5', with_w=True)
-            print('h5 ', np.shape(hs[5]))
-
-            hs.append(None)
-            hs[6], _, _ = conv2d_transpose(hs[5], [self.batch_size, s_h, s_w, self.c_dim], name='g_h6', with_w=True)
-            print('h6 ', np.shape(hs[6]))
 
 
             # for normalisations between 0 and 1 use 'tf.nn.sigmoid(hs[4])'
 
             # return tf.nn.sigmoid(hs[4])
-            return tf.nn.tanh(hs[6])
+            return tf.nn.tanh(hs[4])
 
 
 
