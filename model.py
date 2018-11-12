@@ -32,7 +32,7 @@ def conv_out_size_same(size, stride):
 class DCGAN(object):
     def __init__(self, sess, data_path, image_size=64, is_crop=False,
                  batch_size=10, sample_size=94, lowres=8,
-                 z_dim=200, gf_dim=2, df_dim=2,
+                 z_dim=100, gf_dim=16, df_dim=16,
                  gfc_dim=1024, dfc_dim=1024, c_dim=1,
                  checkpoint_dir=None, lam=0.0):
         """
@@ -182,11 +182,19 @@ class DCGAN(object):
 
         # get number of batches
         batch_idxs = min(len(self.data[:, 0, 0]), config.train_size) // self.batch_size
+        #calculate the decaying learning rate over time
 
-
-        d_optim = tf.train.AdamOptimizer(config.learning_rate, beta1=config.beta1) \
-                          .minimize(self.d_loss, var_list=self.d_vars)
-        g_optim = tf.train.AdamOptimizer(config.learning_rate, beta1=config.beta1) \
+        with tf.name_scope("learning_rate"):
+            batch = tf.Variable(0)
+            global_step = self.batch_size*batch
+            decay_steps = config.train_size  # setup your decay step
+            decay_rate = .95  # setup your decay rate
+            self.learning_rate = tf.train.exponential_decay(config.learning_rate, global_step, decay_steps, decay_rate,
+                                                       name="learning_rate",staircase=True)
+        self.learning_rate_log = tf.summary.scalar("learning_rate", self.learning_rate)
+        d_optim = tf.train.AdamOptimizer(self.learning_rate, beta1=config.beta1) \
+                          .minimize(self.d_loss, var_list=self.d_vars,global_step=batch)
+        g_optim = tf.train.AdamOptimizer(self.learning_rate, beta1=config.beta1) \
                           .minimize(self.g_loss, var_list=self.g_vars)                
         try:
             tf.global_variables_initializer().run()
@@ -196,7 +204,7 @@ class DCGAN(object):
         self.g_sum = tf.summary.merge(
             [self.z_sum, self.d__sum, self.G_sum, self.d_loss_fake_sum, self.g_loss_sum])
         self.d_sum = tf.summary.merge(
-            [self.z_sum, self.d_sum, self.d_loss_real_sum, self.d_loss_sum])
+            [self.z_sum, self.d_sum, self.d_loss_real_sum, self.d_loss_sum,self.learning_rate_log])
         self.writer = tf.summary.FileWriter("./logs", self.sess.graph)
 
         sample_z = np.random.uniform(-1, 1, size=(self.sample_size , self.z_dim))
@@ -232,12 +240,13 @@ class DCGAN(object):
 
 
                 #setup batch z
-                batch_z = np.random.uniform(-1, 1, [config.batch_size, self.z_dim]) \
-                            .astype(np.float32)
+                # batch_z = np.random.uniform(-1, 1, [config.batch_size, self.z_dim]) \
+                #             .astype(np.float32)
 
-                # batch_z = np.random.normal(0, 0.2, [config.batch_size, self.z_dim]) \
-                #     .astype(np.float32)
-
+                batch_z = np.random.normal(0, 0.1, [config.batch_size, self.z_dim]) \
+                    .astype(np.float32)
+                print(config.batch_size,self.z_dim)
+                # batch_z =
 
                 # Update D network
                 _, summary_str = self.sess.run([d_optim, self.d_sum],
@@ -252,6 +261,7 @@ class DCGAN(object):
 
 
                 # Run g_optim twice to make sure that d_loss does not go to zero (different from paper)
+                #!# what happens here
                 _, summary_str = self.sess.run([g_optim, self.g_sum],
                     feed_dict={ self.z: batch_z, self.is_training: True })
                 self.writer.add_summary(summary_str, counter)
