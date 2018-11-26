@@ -23,4 +23,4 @@
 export LD_LIBRARY_PATH=/usr/local/cuda-9.1/lib64:$LD_LIBRARY_PATH
 
 ##run job
-python train-dcgan.py --dataset data/sasha_data_small.npy
+python train-dcgan.py --dataset data/normalised/normalised_cleaned_sasha_train.npy --epoch 35 --batch_size 50 --train_size 2100

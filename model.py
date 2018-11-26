@@ -90,8 +90,9 @@ class DCGAN(object):
         print('logsize ',log_size)
         self.g_bns = [
             batch_norm(name='g_bn{}'.format(i,)) for i in range(log_size)]
-
+        checkpoint_dir_d = '/dis_chkpt/'
         self.checkpoint_dir = checkpoint_dir
+        self.checkpoint_dir_d = checkpoint_dir_d
         self.build_model()
 
         self.model_name = "DCGAN.model"
@@ -188,9 +189,11 @@ class DCGAN(object):
             batch = tf.Variable(0)
             global_step = self.batch_size*batch
             decay_steps = config.train_size  # setup your decay step
-            decay_rate = .95  # setup your decay rate
+            decay_rate = .97  # setup your decay rate
             self.learning_rate = tf.train.exponential_decay(config.learning_rate, global_step, decay_steps, decay_rate,
                                                        name="learning_rate",staircase=True)
+            # tf.train.polynomial_decay(config.learning_rate,global_step,decay_steps,end_learning_rate=0.0000001,power=1.0,cycle=False,
+            #                                             name="learning_rate")
         self.learning_rate_log = tf.summary.scalar("learning_rate", self.learning_rate)
         d_optim = tf.train.AdamOptimizer(self.learning_rate, beta1=config.beta1) \
                           .minimize(self.d_loss, var_list=self.d_vars,global_step=batch)
@@ -243,25 +246,25 @@ class DCGAN(object):
                 # batch_z = np.random.uniform(-1, 1, [config.batch_size, self.z_dim]) \
                 #             .astype(np.float32)
 
-                batch_z = np.random.normal(0, 0.1, [config.batch_size, self.z_dim]) \
+                batch_z = np.random.normal(0, 0.3, [config.batch_size, self.z_dim]) \
                     .astype(np.float32)
                 print(config.batch_size,self.z_dim)
                 # batch_z =
 
                 # Update D network
                 _, summary_str = self.sess.run([d_optim, self.d_sum],
-                    feed_dict={ self.images: batch_images, self.z: batch_z, self.is_training: True })
+                    feed_dict={self.images: batch_images, self.z: batch_z, self.is_training: True })
                 self.writer.add_summary(summary_str, counter)
 
 
                 # Update G network
                 _, summary_str = self.sess.run([g_optim, self.g_sum],
-                    feed_dict={ self.z: batch_z, self.is_training: True })
+                    feed_dict={self.z: batch_z, self.is_training: True })
                 self.writer.add_summary(summary_str, counter)
 
 
                 # Run g_optim twice to make sure that d_loss does not go to zero (different from paper)
-                #!# what happens here
+                #!# what is happening here?
                 _, summary_str = self.sess.run([g_optim, self.g_sum],
                     feed_dict={ self.z: batch_z, self.is_training: True })
                 self.writer.add_summary(summary_str, counter)
@@ -269,7 +272,7 @@ class DCGAN(object):
 
                 errD_fake = self.d_loss_fake.eval({self.z: batch_z, self.is_training: False})
                 errD_real = self.d_loss_real.eval({self.images: batch_images, self.is_training: False})
-                errG = self.g_loss.eval({self.z: batch_z, self.is_training: False})
+                errG = self.g_loss.eval({self.images: batch_images,self.z: batch_z, self.is_training: False})
 
                 counter += 1
                 print("Epoch: [{:2d}] [{:4d}/{:4d}] time: {:4.4f}, d_loss: {:.8f}, g_loss: {:.8f}".format(
@@ -287,7 +290,7 @@ class DCGAN(object):
             if not os.path.exists(p):
                 os.makedirs(p)
         make_dir('hats_imgs')
-        make_dir('completed')
+        make_dir('generated')
         make_dir('difference')
         make_dir('logs')
         make_dir('final')
@@ -329,7 +332,7 @@ class DCGAN(object):
 
         else:
             assert(False)
-
+        result_list = []
         for idx in range(0, batch_idxs):
 
             print('IDX: ',idx, '/',batch_idxs)
@@ -358,7 +361,10 @@ class DCGAN(object):
             #     batch_images = np.pad(batch_images, padSz, 'constant')
             #     batch_images = batch_images.astype(np.float32)
 
-            zhats = np.random.uniform(-1, 1, size=(self.batch_size, self.z_dim))
+            #!# might need to change accordingly.
+            # zhats = np.random.uniform(-1, 1, size=(self.batch_size, self.z_dim))
+            zhats = np.random.normal(0, 0.3, size=(self.batch_size, self.z_dim))
+
             m = 0
             v = 0
 
@@ -367,10 +373,10 @@ class DCGAN(object):
 
             save_image(batch_images[0,:,:,0], [nRows,nCols],
                         os.path.join(config.outDir, 'before.png'))
-            masked_images = np.multiply(batch_images, mask)
+            # masked_images = np.multiply(batch_images, mask)
 
-            save_image(masked_images[0,:,:,0], [nRows,nCols],
-                        os.path.join(config.outDir, 'masked.png'))
+            # save_image(masked_images[0,:,:,0], [nRows,nCols],
+            #             os.path.join(config.outDir, 'masked.png'))
 
 
             for img in range(batchSz):
@@ -388,7 +394,7 @@ class DCGAN(object):
                 }
 
                 # print('idx ',idx,' i ',i,' images ',np.shape(batch_images))
-
+                #!# Generator image?
                 run = [self.complete_loss, self.grad_complete_loss, self.G]
                 loss, g, G_imgs = self.sess.run(run, feed_dict=fd)
 
@@ -429,7 +435,7 @@ class DCGAN(object):
                     pl.savefig(imgName)
 
                     imgName = os.path.join(config.outDir,
-                                           'completed/{0:04d}_{1}.png'.format(i,idx*self.batch_size))
+                                           'generated/{0:04d}_{1}.png'.format(i,idx*self.batch_size))
                     pl.figure(2)
                     pl.clf()
                     pl.imshow(G_imgs[0, :, :, 0])
@@ -485,6 +491,13 @@ class DCGAN(object):
                 else:
                     assert(False)
 
+            #!# discriminator variable.
+
+            results = self.sess.run([self.d_loss_real],feed_dict={self.images: batch_images,
+                                                      self.is_training: True})
+            result_list.append(results)
+            # print("Discriminator's results for image{}".format(batch_images),results)
+            np.savetxt(os.path.join(config.outDir,"dis_result.txt"),result_list)
             #saving final zhats
             np.save('zhat_completed',zhats)
 
@@ -499,6 +512,7 @@ class DCGAN(object):
 
                 pl.imshow(diffimage[i, :, :, 0], interpolation='none',vmin= -1.0,vmax=1.0)
                 pl.colorbar()
+                pl.clim(-0.1, 0.1)
 
                 imgName = os.path.join(config.outDir,
                                        'final/{:04d}_diff.png'.format(frame_idx[i]))
@@ -514,6 +528,7 @@ class DCGAN(object):
 
                 pl.imshow(batch_images[i, :, :, 0], interpolation='none',vmin= -1.0,vmax=1.0)
                 pl.colorbar()
+                pl.clim(0, 1)
 
                 imgName = os.path.join(config.outDir,
                                        'final/{:04d}_batch.png'.format(frame_idx[i]))
@@ -529,6 +544,7 @@ class DCGAN(object):
 
                 pl.imshow(G_imgs[i, :, :, 0], interpolation='none',vmin= -1.0,vmax=1.0)
                 pl.colorbar()
+                pl.clim(0, 1)
 
                 imgName = os.path.join(config.outDir,
                                        'final/{:04d}_G.png'.format(frame_idx[i]))
@@ -573,6 +589,9 @@ class DCGAN(object):
         run = [self.complete_loss, self.grad_complete_loss, self.G]
         loss, g, G_imgs = self.sess.run(run, feed_dict=fd)
 
+
+
+
         diffimage = batch_images - G_imgs
 
         for i in range(len(diffimage[:, 0, 0, 0])):
@@ -609,13 +628,13 @@ class DCGAN(object):
             print('d h3 ', np.shape(h3))
 
             hshape = h3.get_shape().as_list()
-            print(hshape)
+            # print(hshape)
 
             # h4 = linear(tf.reshape(h3, [-1, 8192]), 1, 'd_h4_lin')
             h4 = linear(tf.reshape(h3, [-1, hshape[1] * hshape[2] * hshape[3]]), 1, 'd_h4_lin')
             # h4 = linear(tf.reshape(h3, [-1, 8192]), 1, 'd_h4_lin')
             print('d h4 ', np.shape(h4))
-
+            print("the result this time is", tf.nn.sigmoid(h4))
             return tf.nn.sigmoid(h4), h4
 
     def generator(self, z):
